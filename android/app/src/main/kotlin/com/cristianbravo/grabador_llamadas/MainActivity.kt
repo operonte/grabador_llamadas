@@ -39,6 +39,7 @@ class MainActivity : FlutterActivity() {
                     })
                     result.success(true)
                 }
+                "isRecording" -> result.success(ScreenRecordService.isRecording)
                 else -> result.notImplemented()
             }
         }

@@ -4,6 +4,7 @@ import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.ContentValues
 import android.content.Context
@@ -35,6 +36,11 @@ class ScreenRecordService : Service() {
         const val EXTRA_DATA = "data"
         private const val CHANNEL_ID = "screen_record_channel"
         private const val NOTIFICATION_ID = 1
+
+        /** Consultado desde MainActivity para sincronizar la UI de Flutter tras un
+         *  cambio de estado que no vino del botón de la app (ej: notificación). */
+        var isRecording: Boolean = false
+            private set
     }
 
     private var mediaProjection: MediaProjection? = null
@@ -105,6 +111,7 @@ class ScreenRecordService : Service() {
         )
 
         recorder.start()
+        isRecording = true
     }
 
     private fun openOutputFile(): ParcelFileDescriptor {
@@ -132,11 +139,24 @@ class ScreenRecordService : Service() {
         outputUri = null
     }
 
+    /** Borra el registro de MediaStore si la grabación se detuvo tan rápido que
+     *  el archivo quedó vacío o corrupto, para no dejar basura en la Galería. */
+    private fun discardOutputFile() {
+        val uri = outputUri ?: return
+        contentResolver.delete(uri, null, null)
+        outputUri = null
+    }
+
     private fun stopRecording() {
+        if (!isRecording) return
+        isRecording = false
+
+        var stopFailed = false
         try {
             mediaRecorder?.stop()
         } catch (e: RuntimeException) {
             // Puede lanzar si se detiene muy rápido tras iniciar; el archivo queda descartable.
+            stopFailed = true
         }
         mediaRecorder?.reset()
         mediaRecorder?.release()
@@ -156,7 +176,7 @@ class ScreenRecordService : Service() {
         }
         outputFd = null
 
-        finalizeOutputFile()
+        if (stopFailed) discardOutputFile() else finalizeOutputFile()
 
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
@@ -171,11 +191,29 @@ class ScreenRecordService : Service() {
             notificationManager.createNotificationChannel(channel)
         }
 
+        val contentIntent = PendingIntent.getActivity(
+            this, 0,
+            Intent(this, MainActivity::class.java).apply {
+                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            },
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val stopIntent = Intent(this, ScreenRecordService::class.java).apply {
+            action = ACTION_STOP
+        }
+        val stopPendingIntent = PendingIntent.getService(
+            this, 0, stopIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
         val notification: Notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Grabando pantalla")
             .setContentText("Toca para volver a la app")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
+            .setContentIntent(contentIntent)
+            .addAction(android.R.drawable.ic_media_pause, "Detener", stopPendingIntent)
             .build()
 
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
