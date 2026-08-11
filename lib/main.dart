@@ -102,23 +102,22 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       await _channel.invokeMethod('stopRecording');
+      if (!mounted) return;
       _stopTicker();
       setState(() => _isRecording = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Grabación guardada en Películas/GrabadorLlamadas')),
-        );
-      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Grabación guardada en Películas/GrabadorLlamadas')),
+      );
       return;
     }
 
     setState(() => _isBusy = true);
 
     final micGranted = await _channel.invokeMethod<bool>('requestPermissions') ?? false;
+    if (!mounted) return;
 
     if (!micGranted) {
       setState(() => _isBusy = false);
-      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Se necesita permiso de micrófono para grabar'),
@@ -129,20 +128,21 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
     try {
       final started = await _channel.invokeMethod<bool>('startRecording') ?? false;
+      if (!mounted) return;
       setState(() {
         _isRecording = started;
         _isBusy = false;
       });
       if (started) {
         _startTicker();
-      } else if (mounted) {
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('No se otorgó permiso para grabar la pantalla')),
         );
       }
     } on PlatformException {
-      setState(() => _isBusy = false);
       if (!mounted) return;
+      setState(() => _isBusy = false);
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Ocurrió un error al iniciar la grabación')),
       );

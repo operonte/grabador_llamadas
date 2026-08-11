@@ -238,8 +238,19 @@ class ScreenRecordService : Service() {
             // Puede lanzar si se detiene muy rápido tras iniciar; el archivo queda descartable.
             stopFailed = true
         }
-        mediaRecorder?.reset()
-        mediaRecorder?.release()
+        // Tras un stop() fallido, el MediaRecorder queda en estado de error: reset()
+        // también puede lanzar. Sin este try/catch individual, eso tumbaba el
+        // servicio justo en el caso que el bloque de arriba ya anticipaba.
+        try {
+            mediaRecorder?.reset()
+        } catch (e: Exception) {
+            // ignorar
+        }
+        try {
+            mediaRecorder?.release()
+        } catch (e: Exception) {
+            // ignorar
+        }
         mediaRecorder = null
 
         virtualDisplay?.release()
@@ -358,10 +369,12 @@ class ScreenRecordService : Service() {
                 recorder.resume()
                 isPaused = false
                 button.setImageResource(android.R.drawable.ic_media_pause)
+                button.contentDescription = "Pausar"
             } else {
                 recorder.pause()
                 isPaused = true
                 button.setImageResource(android.R.drawable.ic_media_play)
+                button.contentDescription = "Reanudar"
             }
         } catch (e: IllegalStateException) {
             // Estado inesperado del MediaRecorder; se ignora, el usuario puede

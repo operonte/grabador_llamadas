@@ -59,7 +59,15 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(true)
                 }
-                "listRecordings" -> result.success(recordingsManager.list())
+                "listRecordings" -> {
+                    // list() puede hacer I/O bloqueante (MediaMetadataRetriever como
+                    // respaldo de duración) para grabaciones que MediaStore todavía
+                    // no escaneó; se saca del hilo principal para no arriesgar un ANR.
+                    Thread {
+                        val recordings = recordingsManager.list()
+                        runOnUiThread { result.success(recordings) }
+                    }.start()
+                }
                 "openRecording" -> {
                     recordingsManager.open(call.argument<String>("uri")!!)
                     result.success(true)
