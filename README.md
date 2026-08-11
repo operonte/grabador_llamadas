@@ -18,6 +18,12 @@ usa dos APIs públicas sin restricciones especiales de privacidad.
 El resultado se guarda como `.mp4` en `Películas/GrabadorLlamadas`, visible directamente en
 la Galería.
 
+## Gestión de grabaciones
+
+Desde el ícono de la barra superior se accede a "Mis grabaciones": lista todo lo grabado
+(fecha, duración, tamaño) y permite reproducir, compartir o borrar cada video sin salir de
+la app ni depender de la Galería del sistema.
+
 ## Controles durante la grabación
 
 - **Notificación**: botón "Detener" sin necesidad de volver a la app.

@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'recordings_page.dart';
+
 void main() {
   runApp(const MyApp());
 }
@@ -155,7 +157,20 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Grabador de Llamadas')),
+      appBar: AppBar(
+        title: const Text('Grabador de Llamadas'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.video_library_outlined),
+            tooltip: 'Mis grabaciones',
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(builder: (context) => const RecordingsPage()),
+              );
+            },
+          ),
+        ],
+      ),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,

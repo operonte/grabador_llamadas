@@ -21,6 +21,7 @@ class MainActivity : FlutterActivity() {
     private val requestCodePermissions = 1002
     private var pendingResult: MethodChannel.Result? = null
     private var pendingPermissionResult: MethodChannel.Result? = null
+    private val recordingsManager by lazy { RecordingsManager(this) }
 
     override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -58,6 +59,16 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(true)
                 }
+                "listRecordings" -> result.success(recordingsManager.list())
+                "openRecording" -> {
+                    recordingsManager.open(call.argument<String>("uri")!!)
+                    result.success(true)
+                }
+                "shareRecording" -> {
+                    recordingsManager.share(call.argument<String>("uri")!!)
+                    result.success(true)
+                }
+                "deleteRecording" -> result.success(recordingsManager.delete(call.argument<String>("uri")!!))
                 else -> result.notImplemented()
             }
         }
