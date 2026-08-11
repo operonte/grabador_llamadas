@@ -18,8 +18,10 @@ import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
+import android.os.Environment
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
+import android.os.StatFs
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.DisplayMetrics
@@ -29,6 +31,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.ImageButton
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -80,61 +83,113 @@ class ScreenRecordService : Service() {
     }
 
     private fun startRecording(resultCode: Int, data: Intent) {
-        startForegroundNotification()
-
-        val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-        val projection = projectionManager.getMediaProjection(resultCode, data)
-            ?: throw IllegalStateException("No se pudo iniciar la captura de pantalla")
-        mediaProjection = projection
-        projection.registerCallback(projectionCallback, null)
-
-        val metrics = DisplayMetrics()
-        (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-        val density = metrics.densityDpi
-
-        // Escalamos a un máximo de 1600px en el lado más largo: el contenido es
-        // mayormente UI estática, no video de alto movimiento, así que grabar a la
-        // resolución nativa (1440p+ en varios equipos) solo suma peso de archivo y
-        // carga de CPU/batería sin ganancia real de legibilidad.
-        val maxDimension = 1600
-        val longestSide = maxOf(metrics.widthPixels, metrics.heightPixels)
-        val scale = if (longestSide > maxDimension) maxDimension.toFloat() / longestSide else 1f
-        val width = (metrics.widthPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
-        val height = (metrics.heightPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
-
-        val recorder = MediaRecorder()
-        mediaRecorder = recorder
-
-        val fd = openOutputFile()
-        outputFd = fd
-
-        recorder.apply {
-            setAudioSource(MediaRecorder.AudioSource.MIC)
-            setVideoSource(MediaRecorder.VideoSource.SURFACE)
-            setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-            setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-            setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-            setVideoSize(width, height)
-            setVideoFrameRate(30)
-            setVideoEncodingBitRate(5 * 1000 * 1000)
-            // El audio es lo importante de esta app: fijamos calidad explícita en
-            // vez de dejarla al default de cada fabricante (a veces muy bajo).
-            setAudioEncodingBitRate(128 * 1000)
-            setAudioSamplingRate(44100)
-            setOutputFile(fd.fileDescriptor)
-            prepare()
+        if (!hasEnoughStorage()) {
+            Toast.makeText(this, "Espacio de almacenamiento insuficiente para grabar", Toast.LENGTH_LONG).show()
+            stopSelf()
+            return
         }
 
-        virtualDisplay = projection.createVirtualDisplay(
-            "GrabadorLlamadasDisplay",
-            width, height, density,
-            DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-            recorder.surface, null, null
-        )
+        try {
+            startForegroundNotification()
 
-        recorder.start()
-        isRecording = true
-        showOverlayIfAllowed()
+            val projectionManager = getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+            val projection = projectionManager.getMediaProjection(resultCode, data)
+                ?: throw IllegalStateException("No se pudo iniciar la captura de pantalla")
+            mediaProjection = projection
+            projection.registerCallback(projectionCallback, null)
+
+            val metrics = DisplayMetrics()
+            (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
+            val density = metrics.densityDpi
+
+            // Escalamos a un máximo de 1600px en el lado más largo: el contenido es
+            // mayormente UI estática, no video de alto movimiento, así que grabar a la
+            // resolución nativa (1440p+ en varios equipos) solo suma peso de archivo y
+            // carga de CPU/batería sin ganancia real de legibilidad.
+            val maxDimension = 1600
+            val longestSide = maxOf(metrics.widthPixels, metrics.heightPixels)
+            val scale = if (longestSide > maxDimension) maxDimension.toFloat() / longestSide else 1f
+            val width = (metrics.widthPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
+            val height = (metrics.heightPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
+
+            val recorder = MediaRecorder()
+            mediaRecorder = recorder
+
+            val fd = openOutputFile()
+            outputFd = fd
+
+            recorder.apply {
+                setAudioSource(MediaRecorder.AudioSource.MIC)
+                setVideoSource(MediaRecorder.VideoSource.SURFACE)
+                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
+                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
+                setVideoEncoder(MediaRecorder.VideoEncoder.H264)
+                setVideoSize(width, height)
+                setVideoFrameRate(30)
+                setVideoEncodingBitRate(5 * 1000 * 1000)
+                // El audio es lo importante de esta app: fijamos calidad explícita en
+                // vez de dejarla al default de cada fabricante (a veces muy bajo).
+                setAudioEncodingBitRate(128 * 1000)
+                setAudioSamplingRate(44100)
+                setOutputFile(fd.fileDescriptor)
+                prepare()
+            }
+
+            virtualDisplay = projection.createVirtualDisplay(
+                "GrabadorLlamadasDisplay",
+                width, height, density,
+                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
+                recorder.surface, null, null
+            )
+
+            recorder.start()
+            isRecording = true
+            showOverlayIfAllowed()
+        } catch (e: Exception) {
+            // prepare()/start() pueden fallar por hardware ocupado, codec no
+            // disponible, etc. Sin este catch, una falla acá tumbaba el servicio
+            // completo (crash visible para el usuario) en vez de fallar en silencio.
+            cleanupAfterFailedStart()
+        }
+    }
+
+    private fun hasEnoughStorage(): Boolean {
+        val minimumFreeBytes = 100L * 1024 * 1024 // 100 MB
+        val stat = StatFs(Environment.getExternalStorageDirectory().path)
+        return stat.availableBytes > minimumFreeBytes
+    }
+
+    private fun cleanupAfterFailedStart() {
+        try {
+            mediaRecorder?.reset()
+        } catch (e: Exception) {
+            // ignorar
+        }
+        try {
+            mediaRecorder?.release()
+        } catch (e: Exception) {
+            // ignorar
+        }
+        mediaRecorder = null
+
+        virtualDisplay?.release()
+        virtualDisplay = null
+
+        mediaProjection?.unregisterCallback(projectionCallback)
+        mediaProjection?.stop()
+        mediaProjection = null
+
+        try {
+            outputFd?.close()
+        } catch (e: Exception) {
+            // ignorar
+        }
+        outputFd = null
+
+        discardOutputFile()
+        isRecording = false
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
     }
 
     private fun openOutputFile(): ParcelFileDescriptor {
