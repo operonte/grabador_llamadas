@@ -319,6 +319,9 @@ class ScreenRecordService : Service() {
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         val view = LayoutInflater.from(this).inflate(R.layout.overlay_controls, null)
 
+        val screenMetrics = DisplayMetrics()
+        windowManager.defaultDisplay.getRealMetrics(screenMetrics)
+
         val params = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -345,8 +348,13 @@ class ScreenRecordService : Service() {
                     true
                 }
                 MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    val newX = initialX + (event.rawX - initialTouchX).toInt()
+                    val newY = initialY + (event.rawY - initialTouchY).toInt()
+                    // Sin este límite, arrastrar la burbuja hasta el borde la saca
+                    // de la pantalla y queda inaccesible (sin forma de recuperarla
+                    // salvo detener la grabación desde la notificación).
+                    params.x = newX.coerceIn(0, maxOf(0, screenMetrics.widthPixels - view.width))
+                    params.y = newY.coerceIn(0, maxOf(0, screenMetrics.heightPixels - view.height))
                     windowManager.updateViewLayout(view, params)
                     true
                 }
