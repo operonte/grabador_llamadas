@@ -4,6 +4,11 @@
 (57.8s, en una Meet real): `mean_volume: -31.5 dB`, `max_volume: -3.2 dB` (audio real, no silencio —
 compárese con una prueba fallida anterior donde ambos valores daban `-91.0 dB`, silencio digital).
 
+**Commit de referencia que sí funcionó: `3870e00a48c9b3088c1dda7299e5fbe5d420de0a`**
+("Reemplaza MediaRecorder por pipeline MediaCodec/MediaMuxer para capturar audio en llamadas"). Si en
+el futuro algo se rompe, `git diff 3870e00a48c9b3088c1dda7299e5fbe5d420de0a -- android/` contra el
+estado actual es el primer lugar donde mirar qué cambió en el código desde este punto conocido-bueno.
+
 Este documento existe porque llegar a este punto costó **cinco rondas de arreglos** y agotar varias
 vías que no funcionaron. Si en el futuro el audio de las llamadas deja de grabarse, empieza por leer
 esto antes de tocar código: probablemente algo de lo que se describe abajo se rompió (actualización de
