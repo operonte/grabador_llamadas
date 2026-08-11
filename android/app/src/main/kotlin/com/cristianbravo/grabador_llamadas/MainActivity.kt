@@ -2,12 +2,14 @@ package com.cristianbravo.grabador_llamadas
 
 import android.Manifest
 import android.app.Activity
+import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
 import android.os.Build
 import android.provider.Settings
+import android.text.TextUtils
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -59,6 +61,11 @@ class MainActivity : FlutterActivity() {
                     )
                     result.success(true)
                 }
+                "isAccessibilityServiceEnabled" -> result.success(isAccessibilityServiceEnabled())
+                "openAccessibilitySettings" -> {
+                    startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                    result.success(true)
+                }
                 "listRecordings" -> {
                     // list() puede hacer I/O bloqueante (MediaMetadataRetriever como
                     // respaldo de duración) para grabaciones que MediaStore todavía
@@ -80,6 +87,20 @@ class MainActivity : FlutterActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    /** Android no expone una API directa para esto: hay que revisar la lista de
+     *  servicios de accesibilidad habilitados en Settings.Secure. */
+    private fun isAccessibilityServiceEnabled(): Boolean {
+        val expected = ComponentName(this, RecorderAccessibilityService::class.java).flattenToString()
+        val enabled = Settings.Secure.getString(
+            contentResolver, Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        ) ?: return false
+        val splitter = TextUtils.SimpleStringSplitter(':').apply { setString(enabled) }
+        while (splitter.hasNext()) {
+            if (splitter.next().equals(expected, ignoreCase = true)) return true
+        }
+        return false
     }
 
     private fun requestNeededPermissions() {

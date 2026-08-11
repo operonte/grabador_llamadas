@@ -11,9 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
 import android.graphics.PixelFormat
-import android.hardware.display.DisplayManager
-import android.hardware.display.VirtualDisplay
-import android.media.MediaRecorder
 import android.media.projection.MediaProjection
 import android.media.projection.MediaProjectionManager
 import android.net.Uri
@@ -54,8 +51,7 @@ class ScreenRecordService : Service() {
     }
 
     private var mediaProjection: MediaProjection? = null
-    private var virtualDisplay: VirtualDisplay? = null
-    private var mediaRecorder: MediaRecorder? = null
+    private var pipeline: CallRecordingPipeline? = null
     private var outputUri: Uri? = null
     private var outputFd: ParcelFileDescriptor? = null
 
@@ -112,37 +108,13 @@ class ScreenRecordService : Service() {
             val width = (metrics.widthPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
             val height = (metrics.heightPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
 
-            val recorder = MediaRecorder()
-            mediaRecorder = recorder
-
             val fd = openOutputFile()
             outputFd = fd
 
-            recorder.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
-                setVideoSource(MediaRecorder.VideoSource.SURFACE)
-                setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
-                setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
-                setVideoEncoder(MediaRecorder.VideoEncoder.H264)
-                setVideoSize(width, height)
-                setVideoFrameRate(30)
-                setVideoEncodingBitRate(5 * 1000 * 1000)
-                // El audio es lo importante de esta app: fijamos calidad explícita en
-                // vez de dejarla al default de cada fabricante (a veces muy bajo).
-                setAudioEncodingBitRate(128 * 1000)
-                setAudioSamplingRate(44100)
-                setOutputFile(fd.fileDescriptor)
-                prepare()
-            }
+            val recordingPipeline = CallRecordingPipeline(this, projection, width, height, density, fd)
+            recordingPipeline.start()
+            pipeline = recordingPipeline
 
-            virtualDisplay = projection.createVirtualDisplay(
-                "GrabadorLlamadasDisplay",
-                width, height, density,
-                DisplayManager.VIRTUAL_DISPLAY_FLAG_AUTO_MIRROR,
-                recorder.surface, null, null
-            )
-
-            recorder.start()
             isRecording = true
             showOverlayIfAllowed()
         } catch (e: Exception) {
@@ -161,19 +133,11 @@ class ScreenRecordService : Service() {
 
     private fun cleanupAfterFailedStart() {
         try {
-            mediaRecorder?.reset()
+            pipeline?.stop()
         } catch (e: Exception) {
             // ignorar
         }
-        try {
-            mediaRecorder?.release()
-        } catch (e: Exception) {
-            // ignorar
-        }
-        mediaRecorder = null
-
-        virtualDisplay?.release()
-        virtualDisplay = null
+        pipeline = null
 
         mediaProjection?.unregisterCallback(projectionCallback)
         mediaProjection?.stop()
@@ -232,29 +196,12 @@ class ScreenRecordService : Service() {
 
         var stopFailed = false
         try {
-            if (isPaused) mediaRecorder?.resume()
-            mediaRecorder?.stop()
-        } catch (e: RuntimeException) {
+            pipeline?.stop()
+        } catch (e: Exception) {
             // Puede lanzar si se detiene muy rápido tras iniciar; el archivo queda descartable.
             stopFailed = true
         }
-        // Tras un stop() fallido, el MediaRecorder queda en estado de error: reset()
-        // también puede lanzar. Sin este try/catch individual, eso tumbaba el
-        // servicio justo en el caso que el bloque de arriba ya anticipaba.
-        try {
-            mediaRecorder?.reset()
-        } catch (e: Exception) {
-            // ignorar
-        }
-        try {
-            mediaRecorder?.release()
-        } catch (e: Exception) {
-            // ignorar
-        }
-        mediaRecorder = null
-
-        virtualDisplay?.release()
-        virtualDisplay = null
+        pipeline = null
 
         mediaProjection?.unregisterCallback(projectionCallback)
         mediaProjection?.stop()
@@ -370,23 +317,18 @@ class ScreenRecordService : Service() {
     }
 
     private fun togglePause(view: View) {
-        val recorder = mediaRecorder ?: return
+        val recordingPipeline = pipeline ?: return
         val button = view.findViewById<ImageButton>(R.id.pauseResumeButton)
-        try {
-            if (isPaused) {
-                recorder.resume()
-                isPaused = false
-                button.setImageResource(android.R.drawable.ic_media_pause)
-                button.contentDescription = "Pausar"
-            } else {
-                recorder.pause()
-                isPaused = true
-                button.setImageResource(android.R.drawable.ic_media_play)
-                button.contentDescription = "Reanudar"
-            }
-        } catch (e: IllegalStateException) {
-            // Estado inesperado del MediaRecorder; se ignora, el usuario puede
-            // reintentar o simplemente detener la grabación.
+        if (isPaused) {
+            recordingPipeline.resume()
+            isPaused = false
+            button.setImageResource(android.R.drawable.ic_media_pause)
+            button.contentDescription = "Pausar"
+        } else {
+            recordingPipeline.pause()
+            isPaused = true
+            button.setImageResource(android.R.drawable.ic_media_play)
+            button.contentDescription = "Reanudar"
         }
     }
 

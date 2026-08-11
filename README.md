@@ -6,17 +6,38 @@ Android no hace.
 
 ## Cómo funciona
 
-Android bloquea a nivel de plataforma la captura directa del audio interno de una llamada
-(`AudioPlaybackCapture` excluye explícitamente el audio marcado como
-`USAGE_VOICE_COMMUNICATION`). Esta app no intenta saltarse esa restricción ni requiere root:
-usa dos APIs públicas sin restricciones especiales de privacidad.
+El audio se arma mezclando dos fuentes con `MediaCodec`/`MediaMuxer` (no `MediaRecorder`,
+que no permite combinarlas):
 
+- **Voz del interlocutor**: `AudioPlaybackCaptureConfiguration` capturando el audio que
+  reproduce la otra app. **Confirmado por prueba real que esto NO funciona con apps de
+  videollamada** (Meet, WhatsApp, Zoom): estas marcan su audio de llamada con una
+  clasificación distinta a `USAGE_MEDIA`/`USAGE_GAME`/`USAGE_UNKNOWN` (las únicas que esta
+  API puede capturar), así que la voz del interlocutor no se grava en una llamada de este
+  tipo. Sí sirve para audio de apps normales (reproductor de música, video) fuera de una
+  llamada.
+- **Tu voz**: `AudioSource.MIC`, el micrófono físico. Mientras la llamada mantenga su
+  propia sesión de micrófono activa (`VOICE_COMMUNICATION`/`CAMCORDER`, "privacy-sensitive"),
+  Android silencia por completo el `MIC` de cualquier otra app — **salvo el de un servicio
+  de accesibilidad**. Por eso existe `RecorderAccessibilityService`: no hace nada con los
+  eventos de accesibilidad, solo existe para calificar para esa excepción y que el
+  micrófono de esta app no se silencie durante la llamada. Hay que habilitarlo a mano en
+  Ajustes > Accesibilidad (botón en la pantalla principal). Es una vía inestable: puede
+  variar por fabricante/versión de Android y dejar de funcionar con una actualización; y
+  Google Play prohíbe publicar apps que usen este truco (no aplica acá porque no se
+  publica). Fuera de una llamada activa, el micrófono funciona con normalidad sin necesitar
+  nada de esto.
 - **Video**: `MediaProjection`, capturando el contenido de la pantalla.
-- **Audio**: `MediaRecorder.AudioSource.MIC`, el micrófono físico. Con el **altavoz
-  activado** durante la llamada, el micrófono capta acústicamente ambas voces.
 
 El resultado se guarda como `.mp4` en `Películas/GrabadorLlamadas`, visible directamente en
 la Galería.
+
+### Limitación conocida
+
+No existe hoy una forma confirmada de grabar la voz del interlocutor en una videollamada
+sin root. Alternativas si eso es lo que necesitas: grabación nativa de Meet (cuenta Google
+Workspace), un grabador externo apuntando al parlante en modo altavoz, o unirte a la
+reunión desde una laptop (ahí grabar audio del sistema sí funciona sin esta restricción).
 
 ## Gestión de grabaciones
 
@@ -35,7 +56,6 @@ la app ni depender de la Galería del sistema.
 
 - Flutter 3.44+
 - Android 10 (API 29) o superior
-- Activar el altavoz durante la llamada para que se grabe la voz de la otra persona
 
 ## Ejecutar
 

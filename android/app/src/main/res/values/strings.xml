@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_service_description">Permite que Grabador de Llamadas siga captando tu voz por el micrófono mientras una app de videollamada (Meet, WhatsApp, etc.) mantiene su propia sesión de audio activa. Android silencia el micrófono de cualquier otra app durante una llamada, salvo el de un servicio de accesibilidad; esta app no usa el servicio para nada más.</string>
+</resources>

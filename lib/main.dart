@@ -39,6 +39,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   bool _isRecording = false;
   bool _isBusy = false;
   bool _hasOverlayPermission = false;
+  bool _hasAccessibilityPermission = false;
   Timer? _ticker;
   DateTime? _startedAt;
   Duration _elapsed = Duration.zero;
@@ -48,6 +49,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _checkOverlayPermission();
+    _checkAccessibilityPermission();
   }
 
   @override
@@ -64,6 +66,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     if (state == AppLifecycleState.resumed) {
       _syncStateWithNative();
       _checkOverlayPermission();
+      _checkAccessibilityPermission();
     }
   }
 
@@ -71,6 +74,12 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     final granted = await _channel.invokeMethod<bool>('canDrawOverlays') ?? false;
     if (!mounted || granted == _hasOverlayPermission) return;
     setState(() => _hasOverlayPermission = granted);
+  }
+
+  Future<void> _checkAccessibilityPermission() async {
+    final enabled = await _channel.invokeMethod<bool>('isAccessibilityServiceEnabled') ?? false;
+    if (!mounted || enabled == _hasAccessibilityPermission) return;
+    setState(() => _hasAccessibilityPermission = enabled);
   }
 
   Future<void> _syncStateWithNative() async {
@@ -182,15 +191,27 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
             ),
             const SizedBox(height: 8),
             if (!_isRecording) ...[
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
-                  'Activa el altavoz durante la llamada para que también '
-                  'se grabe la voz de la otra persona.',
+                  _hasAccessibilityPermission
+                      ? 'La voz del interlocutor no se puede grabar en videollamadas '
+                          '(restricción de Android). Con el servicio de accesibilidad '
+                          'activado, tu propia voz sí debería grabarse.'
+                      : 'En videollamadas, Android no deja grabar el audio de la '
+                          'llamada. Activa el servicio de accesibilidad para que al '
+                          'menos tu propia voz se grabe.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ),
+              if (!_hasAccessibilityPermission)
+                TextButton(
+                  onPressed: () async {
+                    await _channel.invokeMethod('openAccessibilitySettings');
+                  },
+                  child: const Text('Activar servicio de accesibilidad'),
+                ),
               TextButton(
                 onPressed: () => _channel.invokeMethod('openBatterySettings'),
                 child: const Text('¿Se corta en llamadas largas? Ajustar batería'),
