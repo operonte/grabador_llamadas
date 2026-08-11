@@ -111,10 +111,12 @@ class _RecordingsPageState extends State<RecordingsPage> {
                         children: [
                           IconButton(
                             icon: const Icon(Icons.share),
+                            tooltip: 'Compartir',
                             onPressed: () => _channel.invokeMethod('shareRecording', {'uri': recording.uri}),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline),
+                            tooltip: 'Borrar',
                             onPressed: () => _delete(recording),
                           ),
                         ],
