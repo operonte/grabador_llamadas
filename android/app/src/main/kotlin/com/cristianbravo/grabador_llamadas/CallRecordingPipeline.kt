@@ -77,6 +77,12 @@ class CallRecordingPipeline(
     private val running = AtomicBoolean(false)
     @Volatile private var paused = false
 
+    /** Controlado en caliente desde el botón de la burbuja: si alguien habla cerca
+     *  del que graba, silencia solo la voz propia sin cortar la grabación. Se sigue
+     *  leyendo micRecord igual (ver runAudioLoop) para no generar overflow en el
+     *  buffer interno de AudioRecord; solo se descarta el contenido. */
+    @Volatile var micMuted = false
+
     /** El primer presentationTimeUs que entrega el codificador de video viene
      *  del reloj de actividad del dispositivo (System.nanoTime()), un número
      *  enorme sin relación con el audio, que nosotros sí arrancamos en 0. Sin
@@ -323,8 +329,9 @@ class CallRecordingPipeline(
             val frames = maxOf(if (micRead > 0) micRead else 0, if (pbRead > 0) pbRead else 0)
             if (frames == 0) continue
 
+            val muteMic = micMuted
             for (i in 0 until frames) {
-                val a = if (micRead > i) micBuf[i].toInt() else 0
+                val a = if (!muteMic && micRead > i) micBuf[i].toInt() else 0
                 val b = if (pbRead > i) pbBuf[i].toInt() else 0
                 mixed[i] = (a + b).coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
             }

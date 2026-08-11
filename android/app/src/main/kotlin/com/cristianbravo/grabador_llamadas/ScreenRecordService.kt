@@ -61,6 +61,7 @@ class ScreenRecordService : Service() {
 
     private var overlayView: View? = null
     private var isPaused = false
+    private var isMicMuted = false
 
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -318,6 +319,7 @@ class ScreenRecordService : Service() {
         }
 
         view.findViewById<View>(R.id.pauseResumeButton).setOnClickListener { togglePause(view) }
+        view.findViewById<View>(R.id.micMuteButton).setOnClickListener { toggleMicMute(view) }
         view.findViewById<View>(R.id.stopButton).setOnClickListener { stopRecording() }
 
         windowManager.addView(view, params)
@@ -340,6 +342,20 @@ class ScreenRecordService : Service() {
         }
     }
 
+    private fun toggleMicMute(view: View) {
+        val recordingPipeline = pipeline ?: return
+        val button = view.findViewById<ImageButton>(R.id.micMuteButton)
+        isMicMuted = !isMicMuted
+        recordingPipeline.micMuted = isMicMuted
+        if (isMicMuted) {
+            button.setImageResource(android.R.drawable.ic_lock_silent_mode)
+            button.contentDescription = "Reactivar micrófono"
+        } else {
+            button.setImageResource(android.R.drawable.ic_btn_speak_now)
+            button.contentDescription = "Mutear micrófono"
+        }
+    }
+
     private fun hideOverlay() {
         val view = overlayView ?: return
         val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
@@ -350,6 +366,7 @@ class ScreenRecordService : Service() {
         }
         overlayView = null
         isPaused = false
+        isMicMuted = false
     }
 
     /** Algunos fabricantes (este equipo incluido, se ve en logcat como

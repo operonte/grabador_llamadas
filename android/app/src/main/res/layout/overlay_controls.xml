@@ -25,6 +25,15 @@
         android:contentDescription="Pausar" />
 
     <ImageButton
+        android:id="@+id/micMuteButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="10dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_btn_speak_now"
+        android:contentDescription="Mutear micrófono" />
+
+    <ImageButton
         android:id="@+id/stopButton"
         android:layout_width="40dp"
         android:layout_height="40dp"

@@ -74,6 +74,18 @@ se graba en una llamada es la TUYA, captada por el micrófono gracias a las piez
 otra persona no se puede grabar por software sin root en este tipo de apps (restricción de plataforma,
 no bug — ver README.md).
 
+### 4. El botón de mutear mic (burbuja) también muta al interlocutor si estás en altavoz
+
+Confirmado por el usuario: con `CallRecordingPipeline.micMuted` activo (botón de mic en la burbuja
+flotante) también desaparece la voz de la otra persona, no solo la propia. **Esto es esperado, no un
+bug** — es consecuencia directa de la pieza 3 de arriba: como Android no deja capturar el audio de Meet
+por software, la única razón por la que la voz del interlocutor llega a grabarse es que el micrófono la
+capta acústicamente del parlante del teléfono (si la llamada está en altavoz). No hay dos señales
+separadas que discriminar en `runAudioLoop()` — es una sola captura de mic que mezcla ambiente + voz
+propia + lo que sea que esté sonando por el parlante en ese momento. Mutear el mic muta todo eso junto.
+Mitigación sin tocar código: usar auriculares durante la llamada — así la voz del interlocutor nunca
+sale por el parlante del teléfono y el mic solo capta la voz propia.
+
 ## Bugs ya resueltos (para no repetirlos)
 
 - **Crash inmediato al grabar**: `BufferOverflowException` al escribir en el buffer de entrada del
