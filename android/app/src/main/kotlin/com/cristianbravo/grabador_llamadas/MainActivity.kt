@@ -5,7 +5,9 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
+import android.provider.Settings
 import androidx.annotation.NonNull
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -40,6 +42,12 @@ class MainActivity : FlutterActivity() {
                     result.success(true)
                 }
                 "isRecording" -> result.success(ScreenRecordService.isRecording)
+                "openBatterySettings" -> {
+                    startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS).apply {
+                        data = Uri.fromParts("package", packageName, null)
+                    })
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }

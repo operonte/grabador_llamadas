@@ -80,9 +80,17 @@ class ScreenRecordService : Service() {
 
         val metrics = DisplayMetrics()
         (getSystemService(Context.WINDOW_SERVICE) as WindowManager).defaultDisplay.getRealMetrics(metrics)
-        val width = metrics.widthPixels
-        val height = metrics.heightPixels
         val density = metrics.densityDpi
+
+        // Escalamos a un máximo de 1600px en el lado más largo: el contenido es
+        // mayormente UI estática, no video de alto movimiento, así que grabar a la
+        // resolución nativa (1440p+ en varios equipos) solo suma peso de archivo y
+        // carga de CPU/batería sin ganancia real de legibilidad.
+        val maxDimension = 1600
+        val longestSide = maxOf(metrics.widthPixels, metrics.heightPixels)
+        val scale = if (longestSide > maxDimension) maxDimension.toFloat() / longestSide else 1f
+        val width = (metrics.widthPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
+        val height = (metrics.heightPixels * scale).toInt().let { if (it % 2 != 0) it - 1 else it }
 
         val recorder = MediaRecorder()
         mediaRecorder = recorder
@@ -98,7 +106,11 @@ class ScreenRecordService : Service() {
             setVideoEncoder(MediaRecorder.VideoEncoder.H264)
             setVideoSize(width, height)
             setVideoFrameRate(30)
-            setVideoEncodingBitRate(8 * 1000 * 1000)
+            setVideoEncodingBitRate(5 * 1000 * 1000)
+            // El audio es lo importante de esta app: fijamos calidad explícita en
+            // vez de dejarla al default de cada fabricante (a veces muy bajo).
+            setAudioEncodingBitRate(128 * 1000)
+            setAudioSamplingRate(44100)
             setOutputFile(fd.fileDescriptor)
             prepare()
         }

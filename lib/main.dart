@@ -162,7 +162,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),
-            if (!_isRecording)
+            if (!_isRecording) ...[
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
@@ -171,8 +171,12 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.grey),
                 ),
-              )
-            else
+              ),
+              TextButton(
+                onPressed: () => _channel.invokeMethod('openBatterySettings'),
+                child: const Text('¿Se corta en llamadas largas? Ajustar batería'),
+              ),
+            ] else
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
