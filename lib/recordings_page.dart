@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'duration_format.dart';
+
 class Recording {
   final String uri;
   final String name;
@@ -28,11 +30,7 @@ class Recording {
     );
   }
 
-  String get formattedDuration {
-    final minutes = duration.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = duration.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
+  String get formattedDuration => formatDuration(duration);
 
   String get formattedSize {
     final mb = sizeBytes / (1024 * 1024);

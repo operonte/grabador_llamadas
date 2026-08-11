@@ -293,7 +293,7 @@ class ScreenRecordService : Service() {
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
             .setContentIntent(contentIntent)
-            .addAction(android.R.drawable.ic_media_pause, "Detener", stopPendingIntent)
+            .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopPendingIntent)
             .build()
 
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)

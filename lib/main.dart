@@ -3,6 +3,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'duration_format.dart';
 import 'recordings_page.dart';
 
 void main() {
@@ -98,12 +99,6 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     setState(() => _elapsed = Duration.zero);
   }
 
-  String _formatElapsed(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
-  }
-
   Future<void> _toggleRecording() async {
     if (_isRecording) {
       await _channel.invokeMethod('stopRecording');
@@ -182,7 +177,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
             ),
             const SizedBox(height: 24),
             Text(
-              _isRecording ? 'Grabando… ${_formatElapsed(_elapsed)}' : 'Detenido',
+              _isRecording ? 'Grabando… ${formatDuration(_elapsed)}' : 'Detenido',
               style: Theme.of(context).textTheme.headlineSmall,
             ),
             const SizedBox(height: 8),

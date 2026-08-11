@@ -3,6 +3,7 @@ package com.cristianbravo.grabador_llamadas
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
+import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
 
@@ -34,18 +35,36 @@ class RecordingsManager(private val context: Context) {
             while (cursor.moveToNext()) {
                 val id = cursor.getLong(idCol)
                 val uri = ContentUris.withAppendedId(collection, id)
+                // MediaStore a veces no tiene la duración calculada todavía justo
+                // después de grabar (el escaneo es asíncrono); si viene en 0,
+                // la calculamos nosotros mismos para no mostrar "00:00" engañoso.
+                val durationMs = cursor.getLong(durationCol).let {
+                    if (it > 0) it else readDurationFallback(uri)
+                }
                 results.add(
                     mapOf(
                         "uri" to uri.toString(),
                         "name" to cursor.getString(nameCol),
                         "dateAddedSeconds" to cursor.getLong(dateCol),
-                        "durationMs" to cursor.getLong(durationCol),
+                        "durationMs" to durationMs,
                         "sizeBytes" to cursor.getLong(sizeCol)
                     )
                 )
             }
         }
         return results
+    }
+
+    private fun readDurationFallback(uri: Uri): Long {
+        return try {
+            MediaMetadataRetriever().use { retriever ->
+                retriever.setDataSource(context, uri)
+                retriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)
+                    ?.toLongOrNull() ?: 0L
+            }
+        } catch (e: Exception) {
+            0L
+        }
     }
 
     fun open(uriString: String) {
