@@ -33,5 +33,17 @@ void main() {
       expect(recording.formattedDuration, '00:00');
       expect(recording.sizeBytes, 0);
     });
+
+    test('no truena si faltan uri o dateAddedSeconds (a diferencia de los demás campos, '
+        'estos no tenían fallback y rompían toda la lista)', () {
+      final recording = Recording.fromMap({
+        'name': 'grabacion_20260810_120000.mp4',
+        'durationMs': 65000,
+        'sizeBytes': 12 * 1024 * 1024,
+      });
+
+      expect(recording.uri, '');
+      expect(recording.dateAdded, DateTime.fromMillisecondsSinceEpoch(0));
+    });
   });
 }

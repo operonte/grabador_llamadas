@@ -41,8 +41,12 @@ class ScreenRecordService : Service() {
         const val ACTION_STOP = "com.cristianbravo.grabador_llamadas.STOP"
         const val EXTRA_RESULT_CODE = "resultCode"
         const val EXTRA_DATA = "data"
-        private const val CHANNEL_ID = "screen_record_channel"
-        private const val NOTIFICATION_ID = 1
+        // Namespaced (no "screen_record_channel"/1 genéricos): este sería el primer
+        // foreground service que declare un proyecto host si esto se integra como
+        // función dentro de otra app más grande, y un ID de notificación genérico
+        // es el choque más probable con lo que ese host ya tenga.
+        private const val CHANNEL_ID = "com.cristianbravo.recorder.capture"
+        private const val NOTIFICATION_ID = 847_213
 
         /** Consultado desde MainActivity para sincronizar la UI de Flutter tras un
          *  cambio de estado que no vino del botón de la app (ej: notificación). */
@@ -161,7 +165,7 @@ class ScreenRecordService : Service() {
         val values = ContentValues().apply {
             put(MediaStore.Video.Media.DISPLAY_NAME, fileName)
             put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
-            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/GrabadorLlamadas")
+            put(MediaStore.Video.Media.RELATIVE_PATH, "Movies/${RecordingsManager.FOLDER_NAME}")
             put(MediaStore.Video.Media.IS_PENDING, 1)
         }
         val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
@@ -229,13 +233,17 @@ class ScreenRecordService : Service() {
             notificationManager.createNotificationChannel(channel)
         }
 
-        val contentIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, MainActivity::class.java).apply {
-                flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            },
-            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
+        // packageManager.getLaunchIntentForPackage en vez de nombrar MainActivity
+        // directamente: si esto se integra como función dentro de otra app, el
+        // Service no puede (ni debe) conocer el nombre de la Activity del host.
+        val launchIntent = packageManager.getLaunchIntentForPackage(packageName)?.apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+        }
+        val contentIntent = launchIntent?.let {
+            PendingIntent.getActivity(
+                this, 0, it, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+        }
 
         val stopIntent = Intent(this, ScreenRecordService::class.java).apply {
             action = ACTION_STOP
@@ -250,7 +258,7 @@ class ScreenRecordService : Service() {
             .setContentText("Toca para volver a la app")
             .setSmallIcon(android.R.drawable.ic_menu_camera)
             .setOngoing(true)
-            .setContentIntent(contentIntent)
+            .apply { if (contentIntent != null) setContentIntent(contentIntent) }
             .addAction(android.R.drawable.ic_menu_close_clear_cancel, "Detener", stopPendingIntent)
             .build()
 
@@ -342,6 +350,17 @@ class ScreenRecordService : Service() {
         }
         overlayView = null
         isPaused = false
+    }
+
+    /** Algunos fabricantes (este equipo incluido, se ve en logcat como
+     *  "moto_freezer") matan el proceso agresivamente poco después de que el
+     *  usuario quita la app de recientes, sin darle tiempo a onDestroy(). Sin
+     *  cortar la grabación acá, CallRecordingPipeline nunca llega a restaurar
+     *  AudioManager.mode y el dispositivo queda forzado en modo "llamada" hasta
+     *  reiniciar — un bug de audio de todo el equipo, no solo de esta función. */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        stopRecording()
+        super.onTaskRemoved(rootIntent)
     }
 
     override fun onDestroy() {

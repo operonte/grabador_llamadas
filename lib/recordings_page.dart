@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import 'duration_format.dart';
+import 'screen_recorder.dart';
 
 class Recording {
   final String uri;
@@ -20,10 +21,10 @@ class Recording {
 
   factory Recording.fromMap(Map<dynamic, dynamic> map) {
     return Recording(
-      uri: map['uri'] as String,
+      uri: map['uri'] as String? ?? '',
       name: map['name'] as String? ?? 'grabacion.mp4',
       dateAdded: DateTime.fromMillisecondsSinceEpoch(
-        (map['dateAddedSeconds'] as int) * 1000,
+        ((map['dateAddedSeconds'] as int?) ?? 0) * 1000,
       ),
       duration: Duration(milliseconds: map['durationMs'] as int? ?? 0),
       sizeBytes: map['sizeBytes'] as int? ?? 0,
@@ -52,9 +53,8 @@ class RecordingsPage extends StatefulWidget {
 }
 
 class _RecordingsPageState extends State<RecordingsPage> {
-  static const _channel = MethodChannel('grabador_llamadas/screen_record');
-
   List<Recording>? _recordings;
+  bool _loadFailed = false;
 
   @override
   void initState() {
@@ -63,11 +63,17 @@ class _RecordingsPageState extends State<RecordingsPage> {
   }
 
   Future<void> _load() async {
-    final raw = await _channel.invokeMethod<List<dynamic>>('listRecordings') ?? [];
-    if (!mounted) return;
-    setState(() {
-      _recordings = raw.map((e) => Recording.fromMap(e as Map)).toList();
-    });
+    setState(() => _loadFailed = false);
+    try {
+      final raw = await ScreenRecorder.listRecordings();
+      if (!mounted) return;
+      setState(() {
+        _recordings = raw.map((e) => Recording.fromMap(e)).toList();
+      });
+    } on PlatformException {
+      if (!mounted) return;
+      setState(() => _loadFailed = true);
+    }
   }
 
   Future<void> _delete(Recording recording) async {
@@ -84,8 +90,24 @@ class _RecordingsPageState extends State<RecordingsPage> {
     );
     if (confirmed != true) return;
 
-    final ok = await _channel.invokeMethod<bool>('deleteRecording', {'uri': recording.uri}) ?? false;
+    final ok = await ScreenRecorder.deleteRecording(recording.uri);
     if (ok) _load();
+  }
+
+  Future<void> _open(Recording recording) async {
+    final ok = await ScreenRecorder.openRecording(recording.uri);
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No hay ninguna app instalada que pueda abrir el video')),
+    );
+  }
+
+  Future<void> _share(Recording recording) async {
+    final ok = await ScreenRecorder.shareRecording(recording.uri);
+    if (!mounted || ok) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('No hay ninguna app instalada para compartir el video')),
+    );
   }
 
   @override
@@ -93,7 +115,18 @@ class _RecordingsPageState extends State<RecordingsPage> {
     final recordings = _recordings;
     return Scaffold(
       appBar: AppBar(title: const Text('Mis grabaciones')),
-      body: recordings == null
+      body: _loadFailed
+          ? Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('No se pudieron cargar las grabaciones'),
+                  const SizedBox(height: 8),
+                  TextButton(onPressed: _load, child: const Text('Reintentar')),
+                ],
+              ),
+            )
+          : recordings == null
           ? const Center(child: CircularProgressIndicator())
           : recordings.isEmpty
               ? const Center(child: Text('Todavía no hay grabaciones'))
@@ -105,14 +138,14 @@ class _RecordingsPageState extends State<RecordingsPage> {
                       leading: const Icon(Icons.videocam),
                       title: Text(recording.formattedDate),
                       subtitle: Text('${recording.formattedDuration} · ${recording.formattedSize}'),
-                      onTap: () => _channel.invokeMethod('openRecording', {'uri': recording.uri}),
+                      onTap: () => _open(recording),
                       trailing: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           IconButton(
                             icon: const Icon(Icons.share),
                             tooltip: 'Compartir',
-                            onPressed: () => _channel.invokeMethod('shareRecording', {'uri': recording.uri}),
+                            onPressed: () => _share(recording),
                           ),
                           IconButton(
                             icon: const Icon(Icons.delete_outline),

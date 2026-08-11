@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(flutter --version)",
+      "Bash(flutter build *)",
+      "WebSearch",
+      "WebFetch(domain:source.android.com)",
+      "WebFetch(domain:cs.android.com)",
+      "WebFetch(domain:cubeacr.app)",
+      "Bash(adb devices *)",
+      "Bash(adb kill-server *)",
+      "Bash(adb start-server *)",
+      "Bash(adb install *)",
+      "Bash(adb logcat *)",
+      "Bash(adb shell *)",
+      "Bash(adb pull *)",
+      "Bash(ffprobe -v error -show_entries format=duration,size,bit_rate:stream=index,codec_type,codec_name,width,height,sample_rate,channels,avg_frame_rate,duration -of default=noprint_wrappers=0 \"/tmp/claude-1000/-home-cristian-X-Github-pro-grabador-llamadas/68dfb4df-b381-426a-afa3-caa2e7e9bc5d/scratchpad/videos/grabacion_20260811_102636.mp4\")",
+      "Bash(ffprobe -v error -select_streams v:0 -count_frames -show_entries stream=nb_read_frames -of default=nokey=1:noprint_wrappers=1 grabacion_20260811_102636.mp4)",
+      "Bash(ffmpeg -i grabacion_20260811_102636.mp4 -af volumedetect -f null /dev/null)",
+      "Bash(ffmpeg -y -i grabacion_20260811_102636.mp4 -ss 5 -vframes 1 frame_5s.png -loglevel error)",
+      "Bash(ffmpeg -y -i grabacion_20260811_102636.mp4 -ss 30 -vframes 1 frame_30s.png -loglevel error)",
+      "Bash(ffprobe -v error -show_entries format=duration,size:stream=index,codec_type,codec_name,sample_rate,channels -of default=noprint_wrappers=0 grabacion_20260811_110952.mp4)",
+      "Bash(ffmpeg -i grabacion_20260811_110952.mp4 -af volumedetect -f null /dev/null)",
+      "Bash(git add *)",
+      "Bash(git commit -m ' *)"
+    ]
+  }
+}

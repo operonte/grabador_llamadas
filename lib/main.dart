@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'duration_format.dart';
 import 'recordings_page.dart';
+import 'screen_recorder.dart';
 
 void main() {
   runApp(const MyApp());
@@ -34,8 +35,6 @@ class RecorderPage extends StatefulWidget {
 }
 
 class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver {
-  static const _channel = MethodChannel('grabador_llamadas/screen_record');
-
   bool _isRecording = false;
   bool _isBusy = false;
   bool _hasOverlayPermission = false;
@@ -71,19 +70,19 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   }
 
   Future<void> _checkOverlayPermission() async {
-    final granted = await _channel.invokeMethod<bool>('canDrawOverlays') ?? false;
+    final granted = await ScreenRecorder.canDrawOverlays();
     if (!mounted || granted == _hasOverlayPermission) return;
     setState(() => _hasOverlayPermission = granted);
   }
 
   Future<void> _checkAccessibilityPermission() async {
-    final enabled = await _channel.invokeMethod<bool>('isAccessibilityServiceEnabled') ?? false;
+    final enabled = await ScreenRecorder.isAccessibilityServiceEnabled();
     if (!mounted || enabled == _hasAccessibilityPermission) return;
     setState(() => _hasAccessibilityPermission = enabled);
   }
 
   Future<void> _syncStateWithNative() async {
-    final recording = await _channel.invokeMethod<bool>('isRecording') ?? false;
+    final recording = await ScreenRecorder.isRecording();
     if (!mounted || recording == _isRecording) return;
     setState(() => _isRecording = recording);
     if (recording) {
@@ -110,7 +109,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
   Future<void> _toggleRecording() async {
     if (_isRecording) {
-      await _channel.invokeMethod('stopRecording');
+      await ScreenRecorder.stopRecording();
       if (!mounted) return;
       _stopTicker();
       setState(() => _isRecording = false);
@@ -122,7 +121,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
     setState(() => _isBusy = true);
 
-    final micGranted = await _channel.invokeMethod<bool>('requestPermissions') ?? false;
+    final micGranted = await ScreenRecorder.requestPermissions();
     if (!mounted) return;
 
     if (!micGranted) {
@@ -136,7 +135,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     }
 
     try {
-      final started = await _channel.invokeMethod<bool>('startRecording') ?? false;
+      final started = await ScreenRecorder.startRecording();
       if (!mounted) return;
       setState(() {
         _isRecording = started;
@@ -208,18 +207,18 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
               if (!_hasAccessibilityPermission)
                 TextButton(
                   onPressed: () async {
-                    await _channel.invokeMethod('openAccessibilitySettings');
+                    await ScreenRecorder.openAccessibilitySettings();
                   },
                   child: const Text('Activar servicio de accesibilidad'),
                 ),
               TextButton(
-                onPressed: () => _channel.invokeMethod('openBatterySettings'),
+                onPressed: () => ScreenRecorder.openBatterySettings(),
                 child: const Text('¿Se corta en llamadas largas? Ajustar batería'),
               ),
               if (!_hasOverlayPermission)
                 TextButton(
                   onPressed: () async {
-                    await _channel.invokeMethod('requestOverlayPermission');
+                    await ScreenRecorder.requestOverlayPermission();
                   },
                   child: const Text('Activar controles flotantes (opcional)'),
                 ),

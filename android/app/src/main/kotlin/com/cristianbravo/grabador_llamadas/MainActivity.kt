@@ -75,14 +75,8 @@ class MainActivity : FlutterActivity() {
                         runOnUiThread { result.success(recordings) }
                     }.start()
                 }
-                "openRecording" -> {
-                    recordingsManager.open(call.argument<String>("uri")!!)
-                    result.success(true)
-                }
-                "shareRecording" -> {
-                    recordingsManager.share(call.argument<String>("uri")!!)
-                    result.success(true)
-                }
+                "openRecording" -> result.success(recordingsManager.open(call.argument<String>("uri")!!))
+                "shareRecording" -> result.success(recordingsManager.share(call.argument<String>("uri")!!))
                 "deleteRecording" -> result.success(recordingsManager.delete(call.argument<String>("uri")!!))
                 else -> result.notImplemented()
             }

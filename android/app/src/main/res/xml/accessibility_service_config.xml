@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- El servicio no procesa ningún evento (ver RecorderAccessibilityService.kt): existe
+     solo para calificar para la exención de silenciamiento de micrófono de Android.
+     accessibilityEventTypes se deja en el mínimo posible en vez de "typeAllMask"
+     para reducir la superficie que una futura revisión de Google Play tendría que
+     evaluar. -->
 <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-    android:accessibilityEventTypes="typeAllMask"
+    android:accessibilityEventTypes="typeWindowStateChanged"
     android:accessibilityFeedbackType="feedbackGeneric"
     android:canRetrieveWindowContent="false"
     android:notificationTimeout="100"

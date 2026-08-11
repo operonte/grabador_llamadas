@@ -1,15 +1,24 @@
 package com.cristianbravo.grabador_llamadas
 
+import android.content.ActivityNotFoundException
 import android.content.ContentUris
 import android.content.Context
 import android.content.Intent
 import android.media.MediaMetadataRetriever
 import android.net.Uri
 import android.provider.MediaStore
+import android.util.Log
 
 /** Consulta, abre, comparte y borra las grabaciones guardadas por la app en
  *  Movies/GrabadorLlamadas, para que el usuario no tenga que salir a la Galería. */
 class RecordingsManager(private val context: Context) {
+
+    companion object {
+        /** Único lugar donde vive el nombre de la carpeta: ScreenRecordService la
+         *  usa para guardar, esta clase para filtrar al listar/buscar. */
+        const val FOLDER_NAME = "GrabadorLlamadas"
+        private const val TAG = "RecordingsManager"
+    }
 
     private val collection = MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
 
@@ -23,7 +32,7 @@ class RecordingsManager(private val context: Context) {
             MediaStore.Video.Media.SIZE
         )
         val selection = "${MediaStore.Video.Media.RELATIVE_PATH} LIKE ?"
-        val selectionArgs = arrayOf("%GrabadorLlamadas%")
+        val selectionArgs = arrayOf("%$FOLDER_NAME%")
         val sortOrder = "${MediaStore.Video.Media.DATE_ADDED} DESC"
 
         context.contentResolver.query(collection, projection, selection, selectionArgs, sortOrder)?.use { cursor ->
@@ -63,21 +72,31 @@ class RecordingsManager(private val context: Context) {
                     ?.toLongOrNull() ?: 0L
             }
         } catch (e: Exception) {
+            Log.w(TAG, "No se pudo leer la duración de respaldo para $uri", e)
             0L
         }
     }
 
-    fun open(uriString: String) {
+    /** Sin este try/catch, un dispositivo sin ninguna app capaz de abrir video/mp4
+     *  (o sin apps para compartir) tumba toda la app: una excepción sin capturar
+     *  en el handler del MethodChannel de MainActivity mata el proceso. */
+    fun open(uriString: String): Boolean {
         val uri = Uri.parse(uriString)
         val intent = Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(uri, "video/mp4")
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(intent)
+        return try {
+            context.startActivity(intent)
+            true
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No hay app para abrir $uri", e)
+            false
+        }
     }
 
-    fun share(uriString: String) {
+    fun share(uriString: String): Boolean {
         val uri = Uri.parse(uriString)
         val sendIntent = Intent(Intent.ACTION_SEND).apply {
             type = "video/mp4"
@@ -87,13 +106,20 @@ class RecordingsManager(private val context: Context) {
         val chooser = Intent.createChooser(sendIntent, "Compartir grabación").apply {
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
-        context.startActivity(chooser)
+        return try {
+            context.startActivity(chooser)
+            true
+        } catch (e: ActivityNotFoundException) {
+            Log.w(TAG, "No hay app para compartir $uri", e)
+            false
+        }
     }
 
     fun delete(uriString: String): Boolean {
         return try {
             context.contentResolver.delete(Uri.parse(uriString), null, null) > 0
         } catch (e: Exception) {
+            Log.e(TAG, "No se pudo borrar $uriString", e)
             false
         }
     }
