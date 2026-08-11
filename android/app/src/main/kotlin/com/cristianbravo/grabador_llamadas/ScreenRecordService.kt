@@ -10,6 +10,7 @@ import android.content.ContentValues
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.graphics.PixelFormat
 import android.hardware.display.DisplayManager
 import android.hardware.display.VirtualDisplay
 import android.media.MediaRecorder
@@ -20,8 +21,14 @@ import android.os.Build
 import android.os.IBinder
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
+import android.provider.Settings
 import android.util.DisplayMetrics
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
+import android.widget.ImageButton
 import androidx.core.app.NotificationCompat
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -48,6 +55,9 @@ class ScreenRecordService : Service() {
     private var mediaRecorder: MediaRecorder? = null
     private var outputUri: Uri? = null
     private var outputFd: ParcelFileDescriptor? = null
+
+    private var overlayView: View? = null
+    private var isPaused = false
 
     private val projectionCallback = object : MediaProjection.Callback() {
         override fun onStop() {
@@ -124,6 +134,7 @@ class ScreenRecordService : Service() {
 
         recorder.start()
         isRecording = true
+        showOverlayIfAllowed()
     }
 
     private fun openOutputFile(): ParcelFileDescriptor {
@@ -162,9 +173,11 @@ class ScreenRecordService : Service() {
     private fun stopRecording() {
         if (!isRecording) return
         isRecording = false
+        hideOverlay()
 
         var stopFailed = false
         try {
+            if (isPaused) mediaRecorder?.resume()
             mediaRecorder?.stop()
         } catch (e: RuntimeException) {
             // Puede lanzar si se detiene muy rápido tras iniciar; el archivo queda descartable.
@@ -229,6 +242,88 @@ class ScreenRecordService : Service() {
             .build()
 
         startForeground(NOTIFICATION_ID, notification, ServiceInfo.FOREGROUND_SERVICE_TYPE_MEDIA_PROJECTION)
+    }
+
+    /** La burbuja es opcional: solo aparece si el usuario ya activó "Dibujar sobre
+     *  otras apps". Si no, la grabación sigue funcionando igual, solo sin burbuja. */
+    private fun showOverlayIfAllowed() {
+        if (!Settings.canDrawOverlays(this)) return
+        if (overlayView != null) return
+
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val view = LayoutInflater.from(this).inflate(R.layout.overlay_controls, null)
+
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            x = 0
+            y = 200
+        }
+
+        var initialX = 0
+        var initialY = 0
+        var initialTouchX = 0f
+        var initialTouchY = 0f
+        view.findViewById<View>(R.id.dragHandle).setOnTouchListener { _, event ->
+            when (event.action) {
+                MotionEvent.ACTION_DOWN -> {
+                    initialX = params.x
+                    initialY = params.y
+                    initialTouchX = event.rawX
+                    initialTouchY = event.rawY
+                    true
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    params.x = initialX + (event.rawX - initialTouchX).toInt()
+                    params.y = initialY + (event.rawY - initialTouchY).toInt()
+                    windowManager.updateViewLayout(view, params)
+                    true
+                }
+                else -> false
+            }
+        }
+
+        view.findViewById<View>(R.id.pauseResumeButton).setOnClickListener { togglePause(view) }
+        view.findViewById<View>(R.id.stopButton).setOnClickListener { stopRecording() }
+
+        windowManager.addView(view, params)
+        overlayView = view
+    }
+
+    private fun togglePause(view: View) {
+        val recorder = mediaRecorder ?: return
+        val button = view.findViewById<ImageButton>(R.id.pauseResumeButton)
+        try {
+            if (isPaused) {
+                recorder.resume()
+                isPaused = false
+                button.setImageResource(android.R.drawable.ic_media_pause)
+            } else {
+                recorder.pause()
+                isPaused = true
+                button.setImageResource(android.R.drawable.ic_media_play)
+            }
+        } catch (e: IllegalStateException) {
+            // Estado inesperado del MediaRecorder; se ignora, el usuario puede
+            // reintentar o simplemente detener la grabación.
+        }
+    }
+
+    private fun hideOverlay() {
+        val view = overlayView ?: return
+        val windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        try {
+            windowManager.removeView(view)
+        } catch (e: IllegalArgumentException) {
+            // La vista ya no estaba adjunta; nada que hacer.
+        }
+        overlayView = null
+        isPaused = false
     }
 
     override fun onDestroy() {

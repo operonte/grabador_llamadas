@@ -18,6 +18,13 @@ usa dos APIs públicas sin restricciones especiales de privacidad.
 El resultado se guarda como `.mp4` en `Películas/GrabadorLlamadas`, visible directamente en
 la Galería.
 
+## Controles durante la grabación
+
+- **Notificación**: botón "Detener" sin necesidad de volver a la app.
+- **Burbuja flotante (opcional)**: si activas "Dibujar sobre otras apps" desde la pantalla
+  principal, aparece una burbuja arrastrable con pausar/reanudar y detener mientras grabas,
+  sin salir de la llamada. Si no la activas, la app funciona igual, solo sin burbuja.
+
 ## Requisitos
 
 - Flutter 3.44+

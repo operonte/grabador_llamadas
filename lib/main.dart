@@ -35,6 +35,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
 
   bool _isRecording = false;
   bool _isBusy = false;
+  bool _hasOverlayPermission = false;
   Timer? _ticker;
   DateTime? _startedAt;
   Duration _elapsed = Duration.zero;
@@ -43,6 +44,7 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _checkOverlayPermission();
   }
 
   @override
@@ -58,7 +60,14 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
     // mientras la app estaba en segundo plano; al volver, sincronizamos.
     if (state == AppLifecycleState.resumed) {
       _syncStateWithNative();
+      _checkOverlayPermission();
     }
+  }
+
+  Future<void> _checkOverlayPermission() async {
+    final granted = await _channel.invokeMethod<bool>('canDrawOverlays') ?? false;
+    if (!mounted || granted == _hasOverlayPermission) return;
+    setState(() => _hasOverlayPermission = granted);
   }
 
   Future<void> _syncStateWithNative() async {
@@ -176,13 +185,22 @@ class _RecorderPageState extends State<RecorderPage> with WidgetsBindingObserver
                 onPressed: () => _channel.invokeMethod('openBatterySettings'),
                 child: const Text('¿Se corta en llamadas largas? Ajustar batería'),
               ),
+              if (!_hasOverlayPermission)
+                TextButton(
+                  onPressed: () async {
+                    await _channel.invokeMethod('requestOverlayPermission');
+                  },
+                  child: const Text('Activar controles flotantes (opcional)'),
+                ),
             ] else
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 32),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
                 child: Text(
-                  'Puedes detenerla desde la notificación sin volver a la app.',
+                  _hasOverlayPermission
+                      ? 'Usa la burbuja flotante para pausar o detener sin salir de la llamada.'
+                      : 'Puedes detenerla desde la notificación sin volver a la app.',
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.grey),
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ),
             const SizedBox(height: 40),

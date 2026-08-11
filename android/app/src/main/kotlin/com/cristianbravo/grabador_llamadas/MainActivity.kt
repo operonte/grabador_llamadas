@@ -48,6 +48,16 @@ class MainActivity : FlutterActivity() {
                     })
                     result.success(true)
                 }
+                "canDrawOverlays" -> result.success(Settings.canDrawOverlays(this))
+                "requestOverlayPermission" -> {
+                    startActivity(
+                        Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:$packageName")
+                        )
+                    )
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }

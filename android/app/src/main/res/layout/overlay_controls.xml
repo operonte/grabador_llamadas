@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="#CC1A1A1A"
+    android:padding="10dp">
+
+    <ImageButton
+        android:id="@+id/dragHandle"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_menu_sort_by_size"
+        android:contentDescription="Mover" />
+
+    <ImageButton
+        android:id="@+id/pauseResumeButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="10dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_media_pause"
+        android:contentDescription="Pausar" />
+
+    <ImageButton
+        android:id="@+id/stopButton"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:layout_marginStart="10dp"
+        android:background="@android:color/transparent"
+        android:src="@android:drawable/ic_menu_close_clear_cancel"
+        android:contentDescription="Detener" />
+
+</LinearLayout>
