@@ -1,0 +1,32 @@
+# Grabador de Llamadas
+
+App de Android hecha en Flutter para grabar pantalla + audio durante llamadas y
+videoconferencias (WhatsApp, Zoom, Meet, etc.), algo que el grabador de pantalla nativo de
+Android no hace.
+
+## Cómo funciona
+
+Android bloquea a nivel de plataforma la captura directa del audio interno de una llamada
+(`AudioPlaybackCapture` excluye explícitamente el audio marcado como
+`USAGE_VOICE_COMMUNICATION`). Esta app no intenta saltarse esa restricción ni requiere root:
+usa dos APIs públicas sin restricciones especiales de privacidad.
+
+- **Video**: `MediaProjection`, capturando el contenido de la pantalla.
+- **Audio**: `MediaRecorder.AudioSource.MIC`, el micrófono físico. Con el **altavoz
+  activado** durante la llamada, el micrófono capta acústicamente ambas voces.
+
+El resultado se guarda como `.mp4` en `Películas/GrabadorLlamadas`, visible directamente en
+la Galería.
+
+## Requisitos
+
+- Flutter 3.44+
+- Android 10 (API 29) o superior
+- Activar el altavoz durante la llamada para que se grabe la voz de la otra persona
+
+## Ejecutar
+
+```
+flutter pub get
+flutter run
+```

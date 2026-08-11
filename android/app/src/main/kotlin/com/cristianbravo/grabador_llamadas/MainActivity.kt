@@ -1,0 +1,97 @@
+package com.cristianbravo.grabador_llamadas
+
+import android.Manifest
+import android.app.Activity
+import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
+import android.os.Build
+import androidx.annotation.NonNull
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
+import io.flutter.embedding.android.FlutterActivity
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.plugin.common.MethodChannel
+
+class MainActivity : FlutterActivity() {
+    private val channelName = "grabador_llamadas/screen_record"
+    private val requestCodeScreenCapture = 1001
+    private val requestCodePermissions = 1002
+    private var pendingResult: MethodChannel.Result? = null
+    private var pendingPermissionResult: MethodChannel.Result? = null
+
+    override fun configureFlutterEngine(@NonNull flutterEngine: FlutterEngine) {
+        super.configureFlutterEngine(flutterEngine)
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, channelName).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "requestPermissions" -> {
+                    pendingPermissionResult = result
+                    requestNeededPermissions()
+                }
+                "startRecording" -> {
+                    pendingResult = result
+                    val manager = getSystemService(MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
+                    startActivityForResult(manager.createScreenCaptureIntent(), requestCodeScreenCapture)
+                }
+                "stopRecording" -> {
+                    startService(Intent(this, ScreenRecordService::class.java).apply {
+                        action = ScreenRecordService.ACTION_STOP
+                    })
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+    }
+
+    private fun requestNeededPermissions() {
+        val needed = mutableListOf(Manifest.permission.RECORD_AUDIO)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            needed.add(Manifest.permission.POST_NOTIFICATIONS)
+        }
+        val missing = needed.filter {
+            ContextCompat.checkSelfPermission(this, it) != PackageManager.PERMISSION_GRANTED
+        }
+        if (missing.isEmpty()) {
+            pendingPermissionResult?.success(true)
+            pendingPermissionResult = null
+        } else {
+            ActivityCompat.requestPermissions(this, missing.toTypedArray(), requestCodePermissions)
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != requestCodePermissions) return
+        val micIndex = permissions.indexOf(Manifest.permission.RECORD_AUDIO)
+        val micGranted = micIndex == -1 || grantResults.getOrNull(micIndex) == PackageManager.PERMISSION_GRANTED
+        pendingPermissionResult?.success(micGranted)
+        pendingPermissionResult = null
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode != requestCodeScreenCapture) return
+
+        if (resultCode == Activity.RESULT_OK && data != null) {
+            val serviceIntent = Intent(this, ScreenRecordService::class.java).apply {
+                action = ScreenRecordService.ACTION_START
+                putExtra(ScreenRecordService.EXTRA_RESULT_CODE, resultCode)
+                putExtra(ScreenRecordService.EXTRA_DATA, data)
+            }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(serviceIntent)
+            } else {
+                startService(serviceIntent)
+            }
+            pendingResult?.success(true)
+        } else {
+            pendingResult?.success(false)
+        }
+        pendingResult = null
+    }
+}
