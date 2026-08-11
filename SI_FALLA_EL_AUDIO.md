@@ -9,6 +9,16 @@ compárese con una prueba fallida anterior donde ambos valores daban `-91.0 dB`,
 el futuro algo se rompe, `git diff 3870e00a48c9b3088c1dda7299e5fbe5d420de0a -- android/` contra el
 estado actual es el primer lugar donde mirar qué cambió en el código desde este punto conocido-bueno.
 
+**Verificación posterior — commit `928f3bb1ece16df4c6245f87ec171d4e1c0eeb23`** ("Aísla la capa
+nativa/Dart para integrarse a Bitácora y agrega manejo de errores"): **100% funcional, confirmado con
+prueba real.** 2026-08-11, grabación `grabacion_20260811_120218.mp4` (36.7s, en una Meet real):
+`mean_volume: -33.9 dB`, `max_volume: -9.3 dB` (audio real). Ese commit tocó `ScreenRecordService.kt`
+(namespacing de notificación, desacople de `MainActivity`, `onTaskRemoved`),
+`accessibility_service_config.xml` y agregó manejo de errores en `RecordingsManager.kt`/capa Dart —
+**no tocó `CallRecordingPipeline.kt`**, así que el commit de referencia de arriba (`3870e00`) sigue
+siendo el primer lugar donde mirar si el audio deja de grabarse. Además se probó manualmente abrir,
+compartir y borrar una grabación desde "Mis grabaciones" sin problemas.
+
 Este documento existe porque llegar a este punto costó **cinco rondas de arreglos** y agotar varias
 vías que no funcionaron. Si en el futuro el audio de las llamadas deja de grabarse, empieza por leer
 esto antes de tocar código: probablemente algo de lo que se describe abajo se rompió (actualización de
